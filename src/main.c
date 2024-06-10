@@ -6,6 +6,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 // Local includes.
 #include "interval_notification.h"
@@ -21,14 +23,129 @@ void interval_notification_handle_signal(int sig) {
   }
 }
 
+int play_jingle_from_file(char *player,
+                          char **player_args,
+                          unsigned int args_count,
+                          char *jingle_filename) {
+  int jingle_fd = open(jingle_filename, O_RDONLY);
+  if (jingle_fd == -1) {
+    puts("ERROR: Failed to play jingle: Failed to open file!");
+    return 2;
+  }
+  close(jingle_fd);
+
+  switch(fork()) {
+  case -1:
+    puts("ERROR: Failed to play jingle: Failed to fork!");
+    return 3;
+  case 0:
+    // Pipe output to /dev/null.
+    int null_fd = open("/dev/null", O_WRONLY);
+    if (null_fd == -1) {
+      puts("ERROR: Failed to redirect play-jingle-output to /dev/null!");
+      exit(4);
+    }
+    dup2(null_fd, 1);
+    dup2(null_fd, 2);
+
+    // Exec.
+    if (args_count == 0 && strcmp(player, "/usr/bin/mpv") == 0) {
+      if (execl(player, player, "--vid=no", jingle_filename, (char*)NULL) == -1) {
+        printf("ERROR: Failed to play with player \"%s\" and jingle \"%s\"!\n", player, jingle_filename);
+        close(null_fd);
+        exit(5);
+      }
+    } else {
+      // Every pointer has the same size, but for sanity use sizeof(char*).
+      char **argvs = malloc(sizeof(char*) * (args_count + 3));
+      memset(argvs, 0, sizeof(char*) * (args_count + 3));
+      argvs[0] = player;
+      printf("<%s> ", player);
+      for (unsigned int i = 0; i < args_count; ++i) {
+        argvs[1 + i] = player_args[i];
+        printf("%s ", player_args[i]);
+      }
+      argvs[1 + args_count] = jingle_filename;
+      printf("%s NULL\n", jingle_filename);
+      if (execv(player, argvs) == -1) {
+        printf("ERROR: Failed to play with player \"%s\"!\n", player);
+        free(argvs);
+        close(null_fd);
+        exit(4);
+      }
+    }
+
+    // This shouldn't run due to exec, but handle it anyway.
+    close(null_fd);
+    exit(0);
+    break;
+  default:
+    // Intentionally left blank.
+    break;
+  }
+
+  return 0;
+}
+
+/// Only supports playing with /usr/bin/mpv .
+int play_jingle_from_memory(const char *jingle_data,
+                            int jingle_size) {
+  int pipe_filedes[2];
+  if (pipe(pipe_filedes) != 0) {
+    puts("ERROR: Failed to play jingle: Failed to create pipe!");
+    return 1;
+  }
+
+  switch(fork()) {
+  case -1:
+    puts("ERROR: Failed to play jingle: Failed to fork!");
+    return 2;
+  case 0:
+    // Handle pipe into stdin.
+    close(pipe_filedes[1]);
+    dup2(pipe_filedes[0], 0);
+
+    // Pipe output to /dev/null.
+    int null_fd = open("/dev/null", O_WRONLY);
+    if (null_fd == -1) {
+      puts("ERROR: Failed to redirect play-jingle-output to /dev/null!");
+      close(pipe_filedes[0]);
+      exit(3);
+    }
+    dup2(null_fd, 1);
+    dup2(null_fd, 2);
+
+    // Exec.
+    if (execl("/usr/bin/mpv", "/usr/bin/mpv", "--vid=no", "-", (char*)NULL) == -1) {
+      printf("ERROR: Failed to play!\n");
+      close(pipe_filedes[0]);
+      close(null_fd);
+      exit(4);
+    }
+
+    // This shouldn't run due to exec, but handle it anyway.
+    close(pipe_filedes[0]);
+    close(null_fd);
+    exit(0);
+    break;
+  default:
+    close(pipe_filedes[0]);
+    write(pipe_filedes[1], jingle_data, jingle_size);
+    close(pipe_filedes[1]);
+    break;
+  }
+
+  return 0;
+}
+
 void print_help(void) {
-  puts("./program [minutes] [file_to_play_on_interval] [player_program]");
+  puts("./program [minutes] [file_to_play_on_interval] [player_program] [player_args...]");
   puts("  minutes defaults to 5, file defaults to internal file, program defaults to \"/usr/bin/mpv\".");
 }
 
 int main(int argc, char **argv) {
-   if (strcmp(argv[1], "help") == 0 || strcmp(argv[1], "-h") == 0
-       || strcmp(argv[1], "--help") == 0) {
+   if (argc > 1 && (strcmp(argv[1], "help") == 0 || strcmp(argv[1], "-h") == 0
+       || strcmp(argv[1], "--help") == 0)) {
      print_help();
      return 0;
    }
@@ -36,6 +153,8 @@ int main(int argc, char **argv) {
   unsigned int minutes = 5;
   char *file_name = NULL;
   char *player_name = NULL;
+  char **player_args = NULL;
+  unsigned int args_count = 0;
 
   if (argc == 1) {
     // Intentionally left blank.
@@ -53,6 +172,12 @@ int main(int argc, char **argv) {
     minutes = atoi(argv[1]);
     file_name = argv[2];
     player_name = argv[3];
+  } else if (argc > 4) {
+    minutes = atoi(argv[1]);
+    file_name = argv[2];
+    player_name = argv[3];
+    player_args = argv + 4;
+    args_count = argc - 4;
   }
 
   if (minutes == 0) {
@@ -66,44 +191,8 @@ int main(int argc, char **argv) {
     printf("Using player \"%s\"...\n", player_name);
   }
 
-  char *play_audio_command;
-  char *temp_filename = NULL;
-
   if (file_name) {
-    int len = strlen(file_name) + 1 + 1;
-    if (player_name) {
-      len += strlen(player_name) + 10;
-    } else {
-      len += 14;
-    }
-    play_audio_command = malloc(len);
-    snprintf(play_audio_command, len, "%s %s",
-        player_name ? player_name : DEFAULT_FILE_PLAYER_PROGRAM, file_name);
-  } else {
-    int len = 5 + 1 + strlen(getenv("USER")) + 7 + 1 + 25 + 10;
-    temp_filename = malloc(len);
-    snprintf(temp_filename, len, "/tmp/%s%07lu_interval_audio_file.mp3",
-             getenv("USER"),
-             random() % 10000000);
-    FILE *fd = fopen(temp_filename, "wb");
-    if (fwrite(interval_notification_mp3, 1, interval_notification_mp3_len, fd)
-        != interval_notification_mp3_len) {
-      free(temp_filename);
-      fclose(fd);
-      puts("ERROR: Failed to save temporary interval audio file to /tmp/!");
-      return 1;
-    }
-    fclose(fd);
-
-    len = strlen(temp_filename) + 1 + 10;
-    if (player_name) {
-      len += strlen(player_name) + 10;
-    } else {
-      len += 14;
-    }
-    play_audio_command = malloc(len);
-    snprintf(play_audio_command, len, "%s %s",
-        player_name ? player_name : DEFAULT_FILE_PLAYER_PROGRAM, temp_filename);
+    printf("Using file \"%s\"...\n", file_name);
   }
 
   // Setup for loop
@@ -113,12 +202,7 @@ int main(int argc, char **argv) {
   memset(&action, 0, sizeof(struct sigaction));
   action.sa_handler = interval_notification_handle_signal;
   if(sigaction(SIGINT, &action, NULL) != 0) {
-    free(play_audio_command);
     puts("ERROR: Failed to set handling of SIGINT!");
-    if (temp_filename) {
-      unlink(temp_filename);
-      free(temp_filename);
-    }
     return 2;
   }
 
@@ -127,22 +211,27 @@ int main(int argc, char **argv) {
   puts("Begin main loop...");
   while(is_running) {
     sleep(minutes * 60);
-/*    sleep(4);*/
+/*    sleep(10);*/
     if (!is_running) {
       break;
     }
-    ret = system(play_audio_command);
+    if (file_name) {
+      ret = play_jingle_from_file(player_name ?
+            player_name : DEFAULT_FILE_PLAYER_PROGRAM,
+          player_args,
+          args_count,
+          file_name);
+    } else {
+      ret = play_jingle_from_memory(interval_notification_mp3,
+                                    interval_notification_mp3_len);
+    }
     if (ret != 0) {
-      printf("ERROR: Executing \"%s\" failed! (returned \"%i\")\n", play_audio_command, ret);
+      printf("ERROR: Failed to play jingle! (returned \"%i\")\n", ret);
       break;
     }
     printf(".");
+    fflush(stdout);
   }
 
-  free(play_audio_command);
-  if (temp_filename) {
-    unlink(temp_filename);
-    free(temp_filename);
-  }
   return 0;
 }
