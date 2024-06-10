@@ -141,6 +141,7 @@ int play_jingle_from_memory(const char *jingle_data,
 void print_help(void) {
   puts("./program [minutes] [file_to_play_on_interval] [player_program] [player_args...]");
   puts("  minutes defaults to 5, file defaults to internal file, program defaults to \"/usr/bin/mpv\".");
+  puts("Note that this program uses execl/execv, so if a program is specified, it must be the full path to the program.");
 }
 
 int main(int argc, char **argv) {
