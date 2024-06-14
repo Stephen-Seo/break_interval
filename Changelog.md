@@ -2,7 +2,11 @@
 
 ## Upcoming Changes
 
+## Version 1.2
+
 Minor tweaks to help text, README.
+
+Add workflow to build break\_interval for x86_64 and aarch64.
 
 ## Version 1.1
 
