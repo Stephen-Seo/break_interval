@@ -4,6 +4,9 @@
 
 More tweaks to README.
 
+Allow playing internal file even if custom player command is specified.  
+Do this by specifying "INTERNAL_FILE" as the filename parameter.
+
 ## Version 1.2
 
 Minor tweaks to help text, README.

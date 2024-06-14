@@ -26,13 +26,22 @@ void interval_notification_handle_signal(int sig) {
 int play_jingle_from_file(char *player,
                           char **player_args,
                           unsigned int args_count,
-                          char *jingle_filename) {
-  int jingle_fd = open(jingle_filename, O_RDONLY);
-  if (jingle_fd == -1) {
-    puts("ERROR: Failed to play jingle: Failed to open file!");
-    return 2;
+                          char *jingle_filename,
+                          int use_internal_file_specified) {
+  int pipe_filedes[2];
+  if (use_internal_file_specified == 0) {
+    int jingle_fd = open(jingle_filename, O_RDONLY);
+    if (jingle_fd == -1) {
+      puts("ERROR: Failed to play jingle: Failed to open file!");
+      return 2;
+    }
+    close(jingle_fd);
+  } else {
+    if (pipe(pipe_filedes) != 0) {
+      puts("ERROR: Failed to play jingle: Failed to create pipe!");
+      return 7;
+    }
   }
-  close(jingle_fd);
 
   switch(fork()) {
   case -1:
@@ -48,10 +57,23 @@ int play_jingle_from_file(char *player,
     dup2(null_fd, 1);
     dup2(null_fd, 2);
 
+    if (use_internal_file_specified != 0) {
+      // Handle pipe into stdin.
+      close(pipe_filedes[1]);
+      dup2(pipe_filedes[0], 0);
+      jingle_filename = "/dev/stdin";
+    }
+
     // Exec.
     if (args_count == 0 && strcmp(player, "/usr/bin/mpv") == 0) {
-      if (execl(player, player, "--vid=no", jingle_filename, (char*)NULL) == -1) {
-        printf("ERROR: Failed to play with player \"%s\" and jingle \"%s\"!\n", player, jingle_filename);
+      if (execl(player,
+                player,
+                "--vid=no",
+                jingle_filename,
+                (char*)NULL)
+          == -1) {
+        printf("ERROR: Failed to play with player \"%s\" and jingle \"%s\"!\n",
+            player, jingle_filename);
         close(null_fd);
         exit(5);
       }
@@ -71,7 +93,7 @@ int play_jingle_from_file(char *player,
         printf("ERROR: Failed to play with player \"%s\"!\n", player);
         free(argvs);
         close(null_fd);
-        exit(4);
+        exit(6);
       }
     }
 
@@ -80,7 +102,13 @@ int play_jingle_from_file(char *player,
     exit(0);
     break;
   default:
-    // Intentionally left blank.
+    if (use_internal_file_specified != 0) {
+      close(pipe_filedes[0]);
+      write(pipe_filedes[1],
+            interval_notification_mp3,
+            interval_notification_mp3_len);
+      close(pipe_filedes[1]);
+    }
     break;
   }
 
@@ -88,8 +116,7 @@ int play_jingle_from_file(char *player,
 }
 
 /// Only supports playing with /usr/bin/mpv .
-int play_jingle_from_memory(const char *jingle_data,
-                            int jingle_size) {
+int play_jingle_from_memory(void) {
   int pipe_filedes[2];
   if (pipe(pipe_filedes) != 0) {
     puts("ERROR: Failed to play jingle: Failed to create pipe!");
@@ -116,7 +143,12 @@ int play_jingle_from_memory(const char *jingle_data,
     dup2(null_fd, 2);
 
     // Exec.
-    if (execl("/usr/bin/mpv", "/usr/bin/mpv", "--vid=no", "-", (char*)NULL) == -1) {
+    if (execl("/usr/bin/mpv",
+              "/usr/bin/mpv",
+              "--vid=no",
+              "-",
+              (char*)NULL)
+        == -1) {
       printf("ERROR: Failed to play!\n");
       close(pipe_filedes[0]);
       close(null_fd);
@@ -130,7 +162,9 @@ int play_jingle_from_memory(const char *jingle_data,
     break;
   default:
     close(pipe_filedes[0]);
-    write(pipe_filedes[1], jingle_data, jingle_size);
+    write(pipe_filedes[1],
+          interval_notification_mp3,
+          interval_notification_mp3_len);
     close(pipe_filedes[1]);
     break;
   }
@@ -156,6 +190,7 @@ int main(int argc, char **argv) {
   char *player_name = NULL;
   char **player_args = NULL;
   unsigned int args_count = 0;
+  int use_internal_file_specified = 0;
 
   if (argc == 1) {
     // Intentionally left blank.
@@ -193,7 +228,12 @@ int main(int argc, char **argv) {
   }
 
   if (file_name) {
-    printf("Using file \"%s\"...\n", file_name);
+    if (strcmp(file_name, "INTERNAL_FILE") == 0) {
+      puts("Using internal file...");
+      use_internal_file_specified = 1;
+    } else {
+      printf("Using file \"%s\"...\n", file_name);
+    }
   }
 
   // Setup for loop
@@ -221,10 +261,10 @@ int main(int argc, char **argv) {
             player_name : DEFAULT_FILE_PLAYER_PROGRAM,
           player_args,
           args_count,
-          file_name);
+          file_name,
+          use_internal_file_specified);
     } else {
-      ret = play_jingle_from_memory(interval_notification_mp3,
-                                    interval_notification_mp3_len);
+      ret = play_jingle_from_memory();
     }
     if (ret != 0) {
       printf("ERROR: Failed to play jingle! (returned \"%i\")\n", ret);
