@@ -1,42 +1,101 @@
 name: Build for Releases
-on: push
+on:
+  push:
+    tags:
+      - '*'
 
 jobs:
-  ensure-releases-exists-and-push-build:
+  ensure-release-exists:
     runs-on: any_archLinux
     steps:
-      - name: Get tags, release, and build
+      - name: Check release and create if it doesn't exist
         run: |
           THE_ACTION_WORKING_DIRECTORY="$(pwd)"
-          curl -X GET 'https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/tags' \
-          -H 'accept: application/json' | jq '.[].name' | tr -d '"' > tag_names
-          for tag_name in $(cat tag_names); do
-            echo $tag_name
-            curl -X GET "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/$tag_name" \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_${tag_name}_check.json" \
-            -w '%{http_code}' > release_${tag_name}_check_code
-            test "404" = "$(cat release_${tag_name}_check_code)" && \
+          curl -X GET "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/$GITHUB_REF_NAME" \
+          -H "Authorization: token ${GITHUB_TOKEN}" \
+          -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_${GITHUB_REF_NAME}_check.json" \
+          -w '%{http_code}' > release_${GITHUB_REF_NAME}_check_code
+          if [[ "404" == "$(cat release_${GITHUB_REF_NAME}_check_code)" ]]; then
             curl --fail-with-body -X POST \
             "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases" \
             -H 'accept: application/json' \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H 'Content-Type: application/json' \
             -d "{
-            \"name\": \"break_interval version ${tag_name}\",
-            \"tag_name\": \"${tag_name}\" }" > "${THE_ACTION_WORKING_DIRECTORY}/release_${tag_name}_create.json" && \
-            (test -d "break_interval" || git clone --depth=1 --no-single-branch https://${GITHUB_TOKEN}@git.seodisparate.com/stephenseo/break_interval.git break_interval) && \
-            pushd break_interval >&/dev/null && \
-            git clean -xfd && git restore . && git checkout "${tag_name}" && \
-            cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release && \
-            make -C buildRelease && \
-            cd buildRelease && strip --strip-unneeded break_interval && \
-            zstd --ultra -20 break_interval -o break_interval_x86_64_${tag_name}.zst && \
+            \"name\": \"break_interval version ${GITHUB_REF_NAME}\",
+            \"tag_name\": \"${GITHUB_REF_NAME}\" }" > "${THE_ACTION_WORKING_DIRECTORY}/release_${GITHUB_REF_NAME}_create.json" && \
+          fi
+
+  ensure-releases-exists-and-push-build-x86_64:
+    needs: ensure-release-exists
+    runs-on: any_archLinux
+    steps:
+      - name: Check release assets and build for x86_64
+        run: |
+          THE_ACTION_WORKING_DIRECTORY="$(pwd)"
+          BUILD_ASSET_NAME="break_interval_x86_64_${GITHUB_REF_NAME}.zst"
+          curl -X GET \
+          "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/${GITHUB_REF_NAME}" \
+          -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_info.json" 2>/dev/null
+          BUILD_ASSET_EXISTS=0
+          for asset in $(jq '.assets.[].name'); do
+            if [[ "$asset" == "$BUILD_ASSET_NAME" ]]; then
+              BUILD_ASSET_EXISTS=1
+              break
+            fi
+          done
+          if ! (( BUILD_ASSET_EXISTS )); then
+            if ! [[ -d "break_interval_clone" ]]; then
+              git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/break_interval.git break_interval_clone
+            fi
+            pushd break_interval_clone >&/dev/null
+            git clean -xfd && git restore . && git checkout "${GITHUB_REF_NAME}"
+            cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release
+            make -C buildRelease
+            strip --strip-unneeded buildRelease/break_interval
+            zstd --ultra -20 buildRelease/break_interval -o "${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME}"
             curl --fail-with-body -X POST \
-            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_${tag_name}_create.json")/assets" \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json")/assets" \
             -H 'accept: application/json' \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H 'Content-Type: multipart/form-data' \
-            -F "attachment=@break_interval_x86_64_${tag_name}.zst;type=application/zstd" > "${THE_ACTION_WORKING_DIRECTORY}/attach_${tag_name}.json"
-            while popd >&/dev/null; do echo -n; done
+            -F "attachment=@${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME};type=application/zstd" > "${THE_ACTION_WORKING_DIRECTORY}/attach_${GITHUB_REF_NAME}.json"
+            popd >&/dev/null
+          fi
+
+  ensure-releases-exists-and-push-build-aarch64:
+    needs: ensure-release-exists
+    runs-on: aarch64_archLinux
+    steps:
+      - name: Check release assets and build for aarch64
+        run: |
+          THE_ACTION_WORKING_DIRECTORY="$(pwd)"
+          BUILD_ASSET_NAME="break_interval_aarch64_${GITHUB_REF_NAME}.zst"
+          curl -X GET \
+          "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/${GITHUB_REF_NAME}" \
+          -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_info.json" 2>/dev/null
+          BUILD_ASSET_EXISTS=0
+          for asset in $(jq '.assets.[].name'); do
+            if [[ "$asset" == "$BUILD_ASSET_NAME" ]]; then
+              BUILD_ASSET_EXISTS=1
+              break
+            fi
           done
+          if ! (( BUILD_ASSET_EXISTS )); then
+            if ! [[ -d "break_interval_clone" ]]; then
+              git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/break_interval.git break_interval_clone
+            fi
+            pushd break_interval_clone >&/dev/null
+            git clean -xfd && git restore . && git checkout "${GITHUB_REF_NAME}"
+            cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release
+            make -C buildRelease
+            strip --strip-unneeded buildRelease/break_interval
+            zstd --ultra -20 buildRelease/break_interval -o "${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME}"
+            curl --fail-with-body -X POST \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json")/assets" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: multipart/form-data' \
+            -F "attachment=@${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME};type=application/zstd" > "${THE_ACTION_WORKING_DIRECTORY}/attach_${GITHUB_REF_NAME}.json"
+            popd >&/dev/null
+          fi
