@@ -38,7 +38,7 @@ jobs:
           "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/${GITHUB_REF_NAME}" \
           -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_info.json" 2>/dev/null
           BUILD_ASSET_EXISTS=0
-          for asset in $(jq '.assets.[].name'); do
+          for asset in $(jq '.assets.[].name' < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json"); do
             if [[ "$asset" == "$BUILD_ASSET_NAME" ]]; then
               BUILD_ASSET_EXISTS=1
               break
@@ -75,7 +75,7 @@ jobs:
           "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/${GITHUB_REF_NAME}" \
           -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_info.json" 2>/dev/null
           BUILD_ASSET_EXISTS=0
-          for asset in $(jq '.assets.[].name'); do
+          for asset in $(jq '.assets.[].name' < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json"); do
             if [[ "$asset" == "$BUILD_ASSET_NAME" ]]; then
               BUILD_ASSET_EXISTS=1
               break
