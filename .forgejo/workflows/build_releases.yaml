@@ -14,7 +14,7 @@ jobs:
           curl -X GET "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/$GITHUB_REF_NAME" \
           -H "Authorization: token ${GITHUB_TOKEN}" \
           -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_${GITHUB_REF_NAME}_check.json" \
-          -w '%{http_code}' > release_${GITHUB_REF_NAME}_check_code
+          -w '%{http_code}' 2>/dev/null > release_${GITHUB_REF_NAME}_check_code
           if [[ "404" == "$(cat release_${GITHUB_REF_NAME}_check_code)" ]]; then
             curl --fail-with-body -X POST \
             "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases" \
@@ -23,7 +23,7 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "{
             \"name\": \"break_interval version ${GITHUB_REF_NAME}\",
-            \"tag_name\": \"${GITHUB_REF_NAME}\" }" > "${THE_ACTION_WORKING_DIRECTORY}/release_${GITHUB_REF_NAME}_create.json" && \
+            \"tag_name\": \"${GITHUB_REF_NAME}\" }" 2>/dev/null > "${THE_ACTION_WORKING_DIRECTORY}/release_${GITHUB_REF_NAME}_create.json"
           fi
 
   ensure-releases-exists-and-push-build-x86_64:
