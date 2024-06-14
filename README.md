@@ -31,3 +31,8 @@ Which will execute (every 5 minutes):
 
     /usr/bin/ffplay -nodisp /my/music/file.mp3
 
+To play the internal file instead of a specified one, use the parameter
+"INTERNAL_FILE" for the filename and break\_interval will play the internal
+file.
+
+    ./break_interval 5 INTERNAL_FILE /usr/bin/ffplay -nodisp

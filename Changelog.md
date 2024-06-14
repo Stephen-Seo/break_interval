@@ -2,6 +2,8 @@
 
 ## Upcoming Changes
 
+## Version 1.3
+
 More tweaks to README.
 
 Allow playing internal file even if custom player command is specified.  
