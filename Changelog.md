@@ -2,6 +2,8 @@
 
 ## Upcoming Changes
 
+More tweaks to README.
+
 ## Version 1.2
 
 Minor tweaks to help text, README.
