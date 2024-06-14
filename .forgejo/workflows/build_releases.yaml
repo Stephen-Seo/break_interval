@@ -1,0 +1,41 @@
+name: Build for Releases
+on: push
+
+jobs:
+  ensure-releases-exists-and-push-build:
+    runs-on: any_archLinux
+    steps:
+      - name: Get tags, release, and build
+        run: |
+          curl -X GET 'https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/tags' \
+          -H 'accept: application/json' | jq '.[].name' | tr -d '"' > tag_names
+          for tag_name in $(cat tag_names); do
+            echo $tag_name
+            curl -X GET "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/$tag_name" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'accept: application/json' -o release_${tag_name}_check.json \
+            -w '%{http_code}' > release_${tag_name}_check_code
+            test "404" = "$(cat release_${tag_name}_check_code)" && \
+            curl --fail-with-body -X POST \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+            \"name\": \"break_interval version ${tag_name}\",
+            \"tag_name\": \"${tag_name}\" }" > release_${tag_name}_create.json && \
+            (test -d "break_interval" || git clone --depth=1 --no-single-branch https://${GITHUB_TOKEN}@git.seodisparate.com/stephenseo/break_interval.git break_interval) && \
+            pushd break_interval >&/dev/null && \
+            git clean -xfd && git restore . && git checkout "${tag_name}" && \
+            cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release && \
+            make -C buildRelease && \
+            cd buildRelease && strip --strip-unneeded break_interval && \
+            zstd --ultra -20 break_interval -o break_interval_x86_64_${tag_name}.zst && \
+            curl --fail-with-body -X POST \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < release_${tag_name}_create.json)/assets" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: multipart/form-data' \
+            -F "attachment=@break_interval_x86_64_${tag_name}.zst;type=application/zstd" > attach_${tag_name}.json
+            while popd >&/dev/null; do echo -n; done
+          done
