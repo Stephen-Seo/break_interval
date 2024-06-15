@@ -26,8 +26,10 @@ jobs:
             \"tag_name\": \"${GITHUB_REF_NAME}\" }" 2>/dev/null > "${THE_ACTION_WORKING_DIRECTORY}/release_${GITHUB_REF_NAME}_create.json"
           fi
 
-  ensure-releases-exists-and-push-build-x86_64:
+  push-build-x86_64:
     needs: ensure-release-exists
+    concurrency:
+      group: push-build-group
     runs-on: x86_64_archLinux
     steps:
       - name: Check release assets and build for x86_64
@@ -75,8 +77,10 @@ jobs:
             popd >&/dev/null
           fi
 
-  ensure-releases-exists-and-push-build-aarch64:
+  push-build-aarch64:
     needs: ensure-release-exists
+    concurrency:
+      group: push-build-group
     runs-on: aarch64_archLinux
     steps:
       - name: Check release assets and build for aarch64
