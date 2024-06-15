@@ -54,12 +54,24 @@ jobs:
             make -C buildRelease
             strip --strip-unneeded buildRelease/break_interval
             zstd --ultra -20 buildRelease/break_interval -o "${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME}"
+            curl --fail-with-body -X GET \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json")" \
+            -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/current_release_info.json" 2>/dev/null
+            curl --fail-with-body -X PATCH \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json")" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"body\": \"$(jq .body < "${THE_ACTION_WORKING_DIRECTORY}/current_release_info.json" | sed -e 's/^"//' -e 's/"$//')
+              SHA256SUM $(find "${THE_ACTION_WORKING_DIRECTORY}" -maxdepth 1 -name "*${BUILD_ASSET_NAME}" -execdir sha256sum '{}' ';')\"
+            }" >&/dev/null
             curl --fail-with-body -X POST \
             "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json")/assets" \
             -H 'accept: application/json' \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H 'Content-Type: multipart/form-data' \
-            -F "attachment=@${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME};type=application/zstd" > "${THE_ACTION_WORKING_DIRECTORY}/attach_${GITHUB_REF_NAME}.json"
+            -F "attachment=@${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME};type=application/zstd" > "${THE_ACTION_WORKING_DIRECTORY}/attach_${GITHUB_REF_NAME}.json" 2>/dev/null
             popd >&/dev/null
           fi
 
@@ -91,11 +103,23 @@ jobs:
             make -C buildRelease
             strip --strip-unneeded buildRelease/break_interval
             zstd --ultra -20 buildRelease/break_interval -o "${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME}"
+            curl --fail-with-body -X GET \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json")" \
+            -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/current_release_info.json" 2>/dev/null
+            curl --fail-with-body -X PATCH \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json")" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"body\": \"$(jq .body < "${THE_ACTION_WORKING_DIRECTORY}/current_release_info.json" | sed -e 's/^"//' -e 's/"$//')
+              SHA256SUM $(find "${THE_ACTION_WORKING_DIRECTORY}" -maxdepth 1 -name "*${BUILD_ASSET_NAME}" -execdir sha256sum '{}' ';')\"
+            }" >&/dev/null
             curl --fail-with-body -X POST \
             "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json")/assets" \
             -H 'accept: application/json' \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H 'Content-Type: multipart/form-data' \
-            -F "attachment=@${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME};type=application/zstd" > "${THE_ACTION_WORKING_DIRECTORY}/attach_${GITHUB_REF_NAME}.json"
+            -F "attachment=@${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME};type=application/zstd" > "${THE_ACTION_WORKING_DIRECTORY}/attach_${GITHUB_REF_NAME}.json" 2>/dev/null
             popd >&/dev/null
           fi
