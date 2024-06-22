@@ -78,7 +78,8 @@ jobs:
           fi
 
   push-build-aarch64:
-    needs: ensure-release-exists
+    if: ${{ always() }}
+    needs: push-build-x86_64
     concurrency:
       group: push-build-group
     runs-on: aarch64_archLinux
