@@ -128,3 +128,58 @@ jobs:
             -F "attachment=@${THE_ACTION_WORKING_DIRECTORY}/${BUILD_ASSET_NAME};type=application/zstd" > "${THE_ACTION_WORKING_DIRECTORY}/attach_${GITHUB_REF_NAME}.json" 2>/dev/null
             popd >&/dev/null
           fi
+  push-build-x86_64_debian:
+    if: ${{ always() }}
+    needs: push-build-aarch64
+    concurrency:
+      group: push-build-group
+    runs-on: debian_docker_bookworm
+    env:
+      BUILD_ASSET_NAME: "break_interval_x86_64_debian_${{ GITHUB_REF_NAME }}"
+    steps:
+      - name: Update and upgrade with apt
+        run: apt-get --yes update && apt-get --yes upgrade
+      - name: Get necessary packages
+        run: apt-get --yes install gcc jq curl cmake make zstd sed
+      - name: Get release info
+        run: |
+          curl -X GET \
+          "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/${GITHUB_REF_NAME}" \
+          -H 'accept: application/json' -o release_info.json
+      - name: Check if asset exists
+        run: |
+          for asset in $(jq '.assets[].name' < release_info.json); do
+            if [[ "$asset" == "$BUILD_ASSET_NAME" ]]; then
+              touch asset_exists
+            fi
+          done
+      - name: Build and publish if asset exists
+        run: |
+          if ! [[ -e ./asset_exists ]]; then
+            git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/break_interval.git break_interval_clone
+            pushd break_interval_clone >&/dev/null
+
+            git checkout "${GITHUB_REF_NAME}"
+            cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release
+            make -C buildRelease
+
+            popd >&/dev/null
+            zstd --ultra -20 break_interval_clone/buildRelease/break_interval -o "${BUILD_ASSET_NAME}"
+
+            curl --fail-with-body -X PATCH \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < release_info.json)" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"body\": \"$(jq .body < release_info.json | sed -e 's/^"//' -e 's/"$//')
+              SHA256SUM $(sha256sum "${BUILD_ASSET_NAME}")\"
+            }" >&/dev/null
+
+            curl --fail-with-body -X POST \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/$(jq .id < release_info.json)/assets" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: multipart/form-data' \
+            -F "attachment=@${BUILD_ASSET_NAME};type=application/zstd" > attach.json 2>/dev/null
+          fi
