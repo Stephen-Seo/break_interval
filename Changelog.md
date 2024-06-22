@@ -4,7 +4,7 @@
 
 ## Version 1.3.1
 
-Updated action/workflow to build for Debain x86_64.
+Updated action/workflow to build for Debian x86_64.
 
 Minor fixes to action/workflow.
 
