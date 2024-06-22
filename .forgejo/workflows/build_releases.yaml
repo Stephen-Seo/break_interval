@@ -40,7 +40,7 @@ jobs:
           "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/${GITHUB_REF_NAME}" \
           -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_info.json" 2>/dev/null
           BUILD_ASSET_EXISTS=0
-          for asset in $(jq '.assets.[].name' < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json"); do
+          for asset in $(jq '.assets.[].name' < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json" | tr -d '"'); do
             if [[ "$asset" == "$BUILD_ASSET_NAME" ]]; then
               BUILD_ASSET_EXISTS=1
               break
@@ -92,7 +92,7 @@ jobs:
           "https://git.seodisparate.com/api/v1/repos/stephenseo/break_interval/releases/tags/${GITHUB_REF_NAME}" \
           -H 'accept: application/json' -o "${THE_ACTION_WORKING_DIRECTORY}/release_info.json" 2>/dev/null
           BUILD_ASSET_EXISTS=0
-          for asset in $(jq '.assets.[].name' < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json"); do
+          for asset in $(jq '.assets.[].name' < "${THE_ACTION_WORKING_DIRECTORY}/release_info.json" | tr -d '"'); do
             if [[ "$asset" == "$BUILD_ASSET_NAME" ]]; then
               BUILD_ASSET_EXISTS=1
               break
@@ -135,12 +135,12 @@ jobs:
       group: push-build-group
     runs-on: docker_debian_bookworm
     env:
-      BUILD_ASSET_NAME: "break_interval_x86_64_debian_${{ GITHUB_REF_NAME }}.zstd"
+      BUILD_ASSET_NAME: "break_interval_x86_64_debian_${{ github.ref_name }}.zstd"
     steps:
       - name: Update and upgrade with apt
         run: apt-get --yes update && apt-get --yes upgrade
       - name: Get necessary packages
-        run: apt-get --yes install gcc jq curl cmake make zstd sed
+        run: apt-get --yes install gcc g++ jq curl cmake make zstd sed git
       - name: Get release info
         run: |
           curl -X GET \
@@ -148,7 +148,7 @@ jobs:
           -H 'accept: application/json' -o release_info.json
       - name: Check if asset exists
         run: |
-          for asset in $(jq '.assets[].name' < release_info.json); do
+          for asset in $(jq '.assets[].name' < release_info.json | tr -d '"'); do
             if [[ "$asset" == "$BUILD_ASSET_NAME" ]]; then
               touch asset_exists
             fi
