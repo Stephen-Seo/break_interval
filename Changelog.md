@@ -2,6 +2,12 @@
 
 ## Upcoming Changes
 
+## Version 1.3.1
+
+Updated action/workflow to build for Debain x86_64.
+
+Minor fixes to action/workflow.
+
 ## Version 1.3
 
 More tweaks to README.
