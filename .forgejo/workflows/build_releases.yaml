@@ -133,9 +133,9 @@ jobs:
     needs: push-build-aarch64
     concurrency:
       group: push-build-group
-    runs-on: debian_docker_bookworm
+    runs-on: docker_debian_bookworm
     env:
-      BUILD_ASSET_NAME: "break_interval_x86_64_debian_${{ GITHUB_REF_NAME }}"
+      BUILD_ASSET_NAME: "break_interval_x86_64_debian_${{ GITHUB_REF_NAME }}.zstd"
     steps:
       - name: Update and upgrade with apt
         run: apt-get --yes update && apt-get --yes upgrade
@@ -153,7 +153,7 @@ jobs:
               touch asset_exists
             fi
           done
-      - name: Build and publish if asset exists
+      - name: Build and publish if asset does not exist
         run: |
           if ! [[ -e ./asset_exists ]]; then
             git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/break_interval.git break_interval_clone
