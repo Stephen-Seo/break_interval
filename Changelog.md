@@ -2,6 +2,12 @@
 
 ## Upcoming Changes
 
+## Version 1.3.2
+
+Updated action/workflow to build for Debian aarch64.
+
+Minor fixes to action/workflow.
+
 ## Version 1.3.1
 
 Updated action/workflow to build for Debian x86_64.
