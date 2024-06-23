@@ -22,7 +22,7 @@ jobs:
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H 'Content-Type: application/json' \
             -d "{
-            \"body\": \"SHA256SUMS\",
+            \"body\": \"    SHA256SUMS\",
             \"name\": \"break_interval version ${GITHUB_REF_NAME}\",
             \"tag_name\": \"${GITHUB_REF_NAME}\" }" 2>/dev/null > "${THE_ACTION_WORKING_DIRECTORY}/release_${GITHUB_REF_NAME}_create.json"
           fi
