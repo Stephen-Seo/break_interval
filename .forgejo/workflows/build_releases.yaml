@@ -136,7 +136,7 @@ jobs:
       group: push-build-group
     runs-on: docker_debian_bookworm
     env:
-      BUILD_ASSET_NAME: "break_interval_x86_64_debian_${{ github.ref_name }}.zstd"
+      BUILD_ASSET_NAME: "break_interval_x86_64_debian_${{ github.ref_name }}.zst"
     steps:
       - name: Update and upgrade with apt
         run: apt-get --yes update && apt-get --yes upgrade
@@ -192,7 +192,7 @@ jobs:
       group: push-build-group
     runs-on: aarch64_docker_debian_bookworm
     env:
-      BUILD_ASSET_NAME: "break_interval_aarch64_debian_${{ github.ref_name }}.zstd"
+      BUILD_ASSET_NAME: "break_interval_aarch64_debian_${{ github.ref_name }}.zst"
     steps:
       - name: Update and upgrade with apt
         run: apt-get --yes update && apt-get --yes upgrade
