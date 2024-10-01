@@ -104,9 +104,12 @@ int play_jingle_from_file(char *player,
   default:
     if (use_internal_file_specified != 0) {
       close(pipe_filedes[0]);
-      write(pipe_filedes[1],
+      ssize_t ret = write(pipe_filedes[1],
             interval_notification_mp3,
             interval_notification_mp3_len);
+      if (ret != interval_notification_mp3_len) {
+        fprintf(stderr, "WARNING: Did not write all bytes of mp3 to player!\n");
+      }
       close(pipe_filedes[1]);
     }
     break;
@@ -161,11 +164,16 @@ int play_jingle_from_memory(void) {
     exit(0);
     break;
   default:
-    close(pipe_filedes[0]);
-    write(pipe_filedes[1],
-          interval_notification_mp3,
-          interval_notification_mp3_len);
-    close(pipe_filedes[1]);
+    {
+      close(pipe_filedes[0]);
+      ssize_t ret = write(pipe_filedes[1],
+            interval_notification_mp3,
+            interval_notification_mp3_len);
+      if (ret != interval_notification_mp3_len) {
+        fprintf(stderr, "WARNING: Did not write all bytes of mp3 to player!\n");
+      }
+      close(pipe_filedes[1]);
+    }
     break;
   }
 
@@ -185,7 +193,8 @@ int main(int argc, char **argv) {
      return 0;
    }
 
-  unsigned int minutes = 5;
+  unsigned int minutes;
+  int temp_minutes = 5;
   char *file_name = NULL;
   char *player_name = NULL;
   char **player_args = NULL;
@@ -200,27 +209,33 @@ int main(int argc, char **argv) {
       print_help();
       return 4;
     }
-    minutes = atoi(argv[1]);
+    temp_minutes = atoi(argv[1]);
   } else if (argc == 3) {
-    minutes = atoi(argv[1]);
+    temp_minutes = atoi(argv[1]);
     file_name = argv[2];
   } else if (argc == 4) {
-    minutes = atoi(argv[1]);
+    temp_minutes = atoi(argv[1]);
     file_name = argv[2];
     player_name = argv[3];
   } else if (argc > 4) {
-    minutes = atoi(argv[1]);
+    temp_minutes = atoi(argv[1]);
     file_name = argv[2];
     player_name = argv[3];
     player_args = argv + 4;
-    args_count = argc - 4;
+    args_count = (unsigned int)(argc - 4);
   }
 
-  if (minutes == 0) {
+  if (temp_minutes == 0) {
     puts("ERROR: Minutes cannot be set to zero!");
     print_help();
     return 3;
+  } else if (temp_minutes < 0) {
+    puts("ERROR: Minutes cannot be negative!");
+    print_help();
+    return 3;
   }
+
+  minutes = (unsigned int)temp_minutes;
 
   printf("Set to %u minutes...\n", minutes);
   if (player_name) {
