@@ -2,6 +2,11 @@
 
 ## Upcoming Changes
 
+## Version 1.3.4
+
+Fix Debian build in workflow/action. This means that the debian-built releases
+should be fixed now.
+
 ## Version 1.3.3
 
 Minor tweak to action/workflow for release assets.  
