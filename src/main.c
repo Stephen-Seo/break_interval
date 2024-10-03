@@ -14,7 +14,7 @@
 
 #define DEFAULT_FILE_PLAYER_PROGRAM "/usr/bin/mpv"
 
-int is_running;
+volatile int is_running;
 
 void interval_notification_handle_signal(int sig) {
   if (sig == SIGINT) {
