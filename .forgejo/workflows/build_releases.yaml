@@ -162,6 +162,10 @@ jobs:
             pushd break_interval_clone >&/dev/null
 
             git checkout "${GITHUB_REF_NAME}"
+
+            # Patch CMakeLists.txt as some flags aren't yet supported by Debian's GCC.
+            sed -i -e 's/-fstrict-flex-arrays=3//g' CMakeLists.txt
+
             cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release
             make -C buildRelease
 
@@ -218,6 +222,10 @@ jobs:
             pushd break_interval_clone >&/dev/null
 
             git checkout "${GITHUB_REF_NAME}"
+
+            # Patch CMakeLists.txt as some flags aren't yet supported by Debian's GCC.
+            sed -i -e 's/-fstrict-flex-arrays=3//g' CMakeLists.txt
+
             cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release
             make -C buildRelease
 
