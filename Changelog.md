@@ -2,6 +2,13 @@
 
 ## Upcoming Changes
 
+## Version 1.3.3
+
+Minor tweak to action/workflow for release assets.  
+Compiler hardening flags, fixes related to flags.  
+Internal change: make flag used by signal "volatile" (doesn't change much for
+users).
+
 ## Version 1.3.2
 
 Updated action/workflow to build for Debian aarch64.
